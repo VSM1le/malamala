@@ -1,6 +1,10 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,9 +18,27 @@ import (
 
 // var validate *validator.Validate
 
-// func init() {
-// 	validate = validator.New()
-// }
+//	func init() {
+//		validate = validator.New()
+//	}
+func generateRandomstring(length int) (string, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func generateApikey() (string, error) {
+	randomString, err := generateRandomstring(32)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.New()
+	hash.Write([]byte(randomString))
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
 
 func (apiCfg *apiConfig) handlerRegisterUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
@@ -90,9 +112,13 @@ func (apiCfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request
 		respondWithERROR(w, 400, "Username or password incorrect")
 		return
 	}
+	apiKey, err := generateApikey()
+	if err != nil {
+		respondWithERROR(w, 500, "Error generate API key")
+	}
 	api, err := apiCfg.DB.GenApiKey(r.Context(), database.GenApiKeyParams{
 		ID:     user_id.ID,
-		ApiKey: uuid.NullUUID{UUID: uuid.New(), Valid: true},
+		ApiKey: sql.NullString{String: apiKey, Valid: true},
 	})
 	if err != nil {
 		respondWithERROR(w, 400, fmt.Sprintf("Can't loggin %v", err))
@@ -100,4 +126,15 @@ func (apiCfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request
 	}
 
 	respondWithJSON(w, 201, api)
+}
+
+func (apiCfg *apiConfig) handlerUserLogout(w http.ResponseWriter, r *http.Request, user database.User) {
+	err := apiCfg.DB.LogoutUser(r.Context(), database.LogoutUserParams{
+		ID:     user.ID,
+		ApiKey: sql.NullString{String: user.ApiKey.String, Valid: true},
+	})
+	if err != nil {
+		respondWithERROR(w, 500, fmt.Sprintf("Can't logout %v", err))
+	}
+	respondWithJSON(w, 200, nil)
 }

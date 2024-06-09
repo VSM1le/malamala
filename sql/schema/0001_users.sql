@@ -7,7 +7,7 @@ create table users (
     user_name varchar(50) NOT NULL unique,
     password TEXT NOT NULL,
     role varchar(20) NOT NULL,
-    api_key UUID,
+    api_key varchar(64) unique,
     parent_user_id UUID REFERENCES users(id) ON DELETE CASCADE
 
 );

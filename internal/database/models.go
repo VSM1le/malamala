@@ -5,6 +5,7 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,6 @@ type User struct {
 	UserName     string
 	Password     string
 	Role         string
-	ApiKey       uuid.NullUUID
+	ApiKey       sql.NullString
 	ParentUserID uuid.NullUUID
 }

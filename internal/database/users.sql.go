@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,12 +60,33 @@ returning id, create_at, update_at, name, user_name, password, role, api_key, pa
 `
 
 type GenApiKeyParams struct {
-	ApiKey uuid.NullUUID
+	ApiKey sql.NullString
 	ID     uuid.UUID
 }
 
 func (q *Queries) GenApiKey(ctx context.Context, arg GenApiKeyParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, genApiKey, arg.ApiKey, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreateAt,
+		&i.UpdateAt,
+		&i.Name,
+		&i.UserName,
+		&i.Password,
+		&i.Role,
+		&i.ApiKey,
+		&i.ParentUserID,
+	)
+	return i, err
+}
+
+const getUserByApi = `-- name: GetUserByApi :one
+select id, create_at, update_at, name, user_name, password, role, api_key, parent_user_id from users where api_key =$1
+`
+
+func (q *Queries) GetUserByApi(ctx context.Context, apiKey sql.NullString) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByApi, apiKey)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -94,4 +116,19 @@ func (q *Queries) LoginUser(ctx context.Context, userName string) (LoginUserRow,
 	var i LoginUserRow
 	err := row.Scan(&i.ID, &i.Password)
 	return i, err
+}
+
+const logoutUser = `-- name: LogoutUser :exec
+update users set api_key = null where id = $1 and api_key = $2
+returning id, create_at, update_at, name, user_name, password, role, api_key, parent_user_id
+`
+
+type LogoutUserParams struct {
+	ID     uuid.UUID
+	ApiKey sql.NullString
+}
+
+func (q *Queries) LogoutUser(ctx context.Context, arg LogoutUserParams) error {
+	_, err := q.db.ExecContext(ctx, logoutUser, arg.ID, arg.ApiKey)
+	return err
 }

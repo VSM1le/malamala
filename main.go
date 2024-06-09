@@ -52,6 +52,7 @@ func main() {
 	v1Router := chi.NewRouter()
 	v1Router.Post("/register", apiCfg.handlerRegisterUser)
 	v1Router.Put("/login", apiCfg.handlerUserLogin)
+	v1Router.Put("/logout", apiCfg.middlewareAuth(apiCfg.handlerUserLogout))
 
 	router.Mount("/v1", v1Router)
 	srv := &http.Server{
